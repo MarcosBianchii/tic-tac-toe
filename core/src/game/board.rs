@@ -1,8 +1,10 @@
-use super::{end::End, piece::Piece};
+use super::{piece::Piece, state::GameState};
+use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct Board([Option<Piece>; 9]);
 
 impl Board {
@@ -18,34 +20,38 @@ impl Board {
         &self.0
     }
 
-    pub fn check_end(&self) -> Option<End> {
+    pub fn check_end(&self, piece: Piece) -> GameState {
         for i in 0..3 {
             if self[(0, i)] == self[(1, i)] && self[(1, i)] == self[(2, i)] {
                 if self[(0, i)].is_some() {
-                    return Some(End::Win);
+                    return GameState::Win(piece);
                 }
             }
 
             if self[(i, 0)] == self[(i, 1)] && self[(i, 1)] == self[(i, 2)] {
                 if self[(i, 0)].is_some() {
-                    return Some(End::Win);
+                    return GameState::Win(piece);
                 }
             }
         }
 
         if self[(0, 0)] == self[(1, 1)] && self[(1, 1)] == self[(2, 2)] {
             if self[(0, 0)].is_some() {
-                return Some(End::Win);
+                return GameState::Win(piece);
             }
         }
 
         if self[(0, 2)] == self[(1, 1)] && self[(1, 1)] == self[(2, 0)] {
             if self[(0, 2)].is_some() {
-                return Some(End::Win);
+                return GameState::Win(piece);
             }
         }
 
-        self.is_full().then_some(End::Stalemate)
+        if self.is_full() {
+            return GameState::Stalemate;
+        }
+
+        GameState::Playing
     }
 }
 
@@ -123,24 +129,24 @@ mod tests {
     #[test]
     fn end() {
         let board = Board::from_str("x x x  - - -  x x x").unwrap();
-        assert_eq!(Some(End::Win), board.check_end());
+        assert_eq!(GameState::Win(Piece::X), board.check_end(Piece::X));
 
         let board = Board::from_str("- - -  x x x  - - -").unwrap();
-        assert_eq!(Some(End::Win), board.check_end());
+        assert_eq!(GameState::Win(Piece::X), board.check_end(Piece::X));
 
         let board = Board::from_str("- - -  - - -  x x x").unwrap();
-        assert_eq!(Some(End::Win), board.check_end());
+        assert_eq!(GameState::Win(Piece::X), board.check_end(Piece::X));
 
         let board = Board::from_str("x - -  - x -  - - x").unwrap();
-        assert_eq!(Some(End::Win), board.check_end());
+        assert_eq!(GameState::Win(Piece::X), board.check_end(Piece::X));
 
         let board = Board::from_str("- - x  - x -  x - -").unwrap();
-        assert_eq!(Some(End::Win), board.check_end());
+        assert_eq!(GameState::Win(Piece::X), board.check_end(Piece::X));
 
         let board = Board::from_str("- - -  - - -  - - -").unwrap();
-        assert_eq!(None, board.check_end());
+        assert_eq!(GameState::Playing, board.check_end(Piece::X));
 
         let board = Board::from_str("o x o  o x o  x o x").unwrap();
-        assert_eq!(Some(End::Stalemate), board.check_end());
+        assert_eq!(GameState::Stalemate, board.check_end(Piece::X));
     }
 }

@@ -1,5 +1,6 @@
 use crate::game::Game;
 use crate::threadpool::ThreadPool;
+use core::game::piece::Piece;
 use core::{read_str, write_str};
 use core::{request::Request, response::Response};
 use serde_json;
@@ -16,71 +17,55 @@ impl Server {
         Self(address)
     }
 
-    pub fn send<W: Write>(stream: &mut W, res: Response) -> io::Result<()> {
+    fn send<W: Write>(stream: &mut W, res: Response) -> io::Result<()> {
         let json = serde_json::to_string(&res)?;
         write_str(stream, &json)
     }
 
+    fn register_user(stream: TcpStream, game: &Arc<Mutex<Game>>) -> Option<Piece> {
+        game.lock()
+            .map(|mut game| game.assign_piece(stream))
+            .ok()
+            .flatten()
+    }
+
     fn handle_client(mut stream: TcpStream, game: Arc<Mutex<Game>>) -> io::Result<()> {
-        let piece = game.lock().unwrap().assign_piece(stream.try_clone()?);
-        Self::send(&mut stream, Response::Connect { piece })?;
-        let ip = stream.peer_addr().unwrap();
-        println!("player {piece} ({ip}) connected");
+        let Some(piece) = Self::register_user(stream.try_clone()?, &game) else {
+            return Ok(());
+        };
+
+        let ip = stream.peer_addr()?.ip();
+        println!("Player `{piece}` ({ip}) connected");
+        let board = game.lock().unwrap().board;
+        Self::send(&mut stream, Response::Connect { piece, board })?;
 
         loop {
-            let Ok(data) = read_str(&mut stream) else {
-                return Ok(());
-            };
+            println!("{:?}", game.lock().unwrap().board);
 
-            // Get Request from client.
-            let mut game = game.lock().unwrap();
-            let idx = match serde_json::from_str(&data) {
-                Ok(Request::Play { idx }) => idx,
-                Ok(Request::Disconnect) => {
-                    let ip = stream.local_addr().unwrap();
-                    println!("player {piece} ({ip}) disconnected");
+            let req = read_str(&mut stream)?;
+            let req: Request = serde_json::from_str(&req)?;
+
+            match req {
+                Request::Play { idx } => {
+                    let mut game = game.lock().unwrap();
+                    let res = game.play(piece, idx);
+
+                    match res {
+                        Response::Valid { .. } => game.broadcast(res)?,
+                        _ => game.send(piece, res)?,
+                    }
+                }
+
+                Request::Disconnect => {
+                    let mut game = game.lock().unwrap();
                     game.players.remove(&piece);
-                    return Ok(());
-                }
-
-                Err(_) => {
-                    let _ = Self::send(&mut stream, Response::Invalid);
-                    continue;
+                    println!("Player `{piece}` ({ip}) disconnected");
+                    break;
                 }
             };
-
-            // Check if the game is full.
-            if game.players.len() < 2 {
-                let _ = Self::send(&mut stream, Response::WaitingForPlayer);
-                continue;
-            }
-
-            // Check if the piece is valid.
-            if !game.players.contains_key(&piece) {
-                let _ = Self::send(&mut stream, Response::Invalid);
-                continue;
-            }
-
-            // Check if it's the player's turn.
-            if piece != game.turn {
-                let _ = Self::send(&mut stream, Response::Invalid);
-                continue;
-            }
-
-            // Check if the position is empty.
-            if game.board[idx].is_some() {
-                let _ = Self::send(&mut stream, Response::Invalid);
-                continue;
-            }
-
-            // Update the board and broadcast the response.
-            game.board[idx] = Some(piece);
-            println!("{:?}", game.board);
-
-            game.turn.next();
-            game.broadcast(Response::Valid { piece, idx })?;
-            drop(game);
         }
+
+        Ok(())
     }
 
     pub fn run(self, nthreads: usize) -> Result<(), &'static str> {
@@ -88,8 +73,8 @@ impl Server {
             return Err("Failed to bind to address");
         };
 
-        let game = Arc::new(Mutex::new(Game::new()));
         let pool = ThreadPool::new(nthreads);
+        let game = Arc::new(Mutex::new(Game::new()));
         println!("Listening at address {}", self.0);
 
         for stream in listener.incoming().flatten() {

@@ -1,3 +1,4 @@
+use core::game::board::Board;
 use core::response::Response;
 use core::{game::piece::Piece, request::Request};
 use core::{read_str, write_str};
@@ -30,6 +31,35 @@ impl Client {
         port.parse::<u16>().is_ok()
     }
 
+    fn connect(stream: &mut TcpStream) -> io::Result<(Piece, Board)> {
+        let data = read_str(stream)?;
+        let res: Response = serde_json::from_str(&data)?;
+
+        match res {
+            Response::Connect { piece, board } => Ok((piece, board)),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Failed to connect",
+            )),
+        }
+    }
+
+    pub fn new(address: &str) -> Result<(Self, Board, Piece), &'static str> {
+        if !Self::validate_address(address) {
+            return Err("Invalid IP address");
+        }
+
+        let Ok(mut stream) = TcpStream::connect(address) else {
+            return Err("Could not connect to server");
+        };
+
+        let Ok((piece, board)) = Self::connect(&mut stream) else {
+            return Err("Failed to connect to server");
+        };
+
+        Ok((Self { stream }, board, piece))
+    }
+
     pub fn send_request(&mut self, req: Request) -> io::Result<()> {
         let json = serde_json::to_string(&req)?;
         write_str(&mut self.stream, &json)
@@ -40,27 +70,13 @@ impl Client {
         let err = io::Error::new(io::ErrorKind::InvalidData, "Failed to deserialize response");
         serde_json::from_str(&data).map_err(|_| err)
     }
+}
 
-    pub fn connect(&mut self) -> io::Result<Piece> {
-        match self.recv_response() {
-            Ok(Response::Connect { piece }) => Ok(piece),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Failed to connect to server",
-            )),
+impl Clone for Client {
+    fn clone(&self) -> Self {
+        Self {
+            stream: self.stream.try_clone().unwrap(),
         }
-    }
-
-    pub fn new(address: &str) -> Result<Self, &'static str> {
-        if !Self::validate_address(address) {
-            return Err("Invalid IP address");
-        }
-
-        let Ok(stream) = TcpStream::connect(address) else {
-            return Err("Could not connect to server");
-        };
-
-        Ok(Self { stream })
     }
 }
 

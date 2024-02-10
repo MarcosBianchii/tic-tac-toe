@@ -1,3 +1,4 @@
+use core::game::state::GameState;
 use core::game::{board::Board, piece::Piece};
 use core::response::Response;
 use core::write_str;
@@ -26,15 +27,52 @@ impl Game {
         Ok(())
     }
 
-    pub fn assign_piece(&mut self, stream: TcpStream) -> Piece {
-        let piece = match self.players.len() {
-            0 => Piece::X,
-            1 => Piece::O,
-            _ => unreachable!(),
-        };
+    pub fn assign_piece(&mut self, stream: TcpStream) -> Option<Piece> {
+        (self.players.len() < 2).then_some({
+            let piece = if self.players.contains_key(&Piece::X) {
+                Piece::O
+            } else {
+                Piece::X
+            };
 
-        self.players.insert(piece, stream);
-        piece
+            self.players.insert(piece, stream);
+            piece
+        })
+    }
+
+    pub fn play(&mut self, piece: Piece, idx: (usize, usize)) -> Response {
+        if piece != self.turn {
+            return Response::Invalid;
+        }
+
+        if self.board[idx].is_some() {
+            return Response::Invalid;
+        }
+
+        self.board[idx] = Some(piece);
+        self.turn.next();
+
+        let state = self.board.check_end(piece);
+        let board = self.board;
+
+        if state != GameState::Playing {
+            self.board = Board::new();
+            self.turn = Piece::default();
+        }
+
+        Response::Valid { board, state }
+    }
+
+    pub fn send(&mut self, piece: Piece, res: Response) -> io::Result<()> {
+        let json = serde_json::to_string(&res)?;
+
+        self.players
+            .get_mut(&piece)
+            .map(|stream| write_str(stream, &json))
+            .ok_or(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Failed to send response",
+            ))?
     }
 }
 

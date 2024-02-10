@@ -6,11 +6,16 @@ pub fn clear() {
 }
 
 pub fn print_board(board: &Board, idx: (usize, usize)) {
+    clear();
     for i in 0..3 {
         for j in 0..3 {
             print!(" ");
             let piece = if (i, j) == idx {
-                "_".to_string().green()
+                if let Some(piece) = board[(i, j)] {
+                    piece.to_string().white()
+                } else {
+                    "_".to_string().white()
+                }
             } else {
                 board[(i, j)]
                     .map(|x| {
@@ -40,6 +45,7 @@ pub fn print_board(board: &Board, idx: (usize, usize)) {
 
 #[allow(dead_code)]
 pub fn print_stalemate(board: &Board) {
+    clear();
     for i in 0..3 {
         for j in 0..3 {
             print!(" ");
@@ -69,6 +75,7 @@ pub fn print_stalemate(board: &Board) {
 
 #[allow(dead_code)]
 pub fn print_victory(board: &Board, player: Piece) {
+    clear();
     let color = match player {
         Piece::X => |s: &str| s.red(),
         Piece::O => |s: &str| s.blue(),
