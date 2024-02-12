@@ -1,7 +1,6 @@
-use core::game::board::Board;
-use core::response::Response;
-use core::{game::piece::Piece, request::Request};
-use core::{read_str, write_str};
+use core::game::{board::Board, piece::Piece};
+use core::{io_err, read_str, write_str};
+use core::{request::Request, response::Response};
 use std::{io, net::TcpStream};
 
 pub struct Client {
@@ -10,7 +9,7 @@ pub struct Client {
 
 impl Client {
     fn validate_address(address: &str) -> bool {
-        let &[address, port] = address.split(":").collect::<Vec<_>>().as_slice() else {
+        let &[address, port] = address.split(':').collect::<Vec<_>>().as_slice() else {
             return false;
         };
 
@@ -18,13 +17,7 @@ impl Client {
             return false;
         }
 
-        let count = address
-            .split('.')
-            .map(|n| n.parse::<u8>())
-            .flatten()
-            .count();
-
-        if count != 4 {
+        if address.split('.').flat_map(str::parse::<u8>).count() != 4 {
             return false;
         }
 
@@ -36,11 +29,8 @@ impl Client {
         let res: Response = serde_json::from_str(&data)?;
 
         match res {
-            Response::Connect { piece, board } => Ok((piece, board)),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Failed to connect",
-            )),
+            Response::Init { piece, board } => Ok((piece, board)),
+            _ => Err(io_err!("Failed to connect")),
         }
     }
 
@@ -50,7 +40,7 @@ impl Client {
         }
 
         let Ok(mut stream) = TcpStream::connect(address) else {
-            return Err("Could not connect to server");
+            return Err("Could not establish connection to server");
         };
 
         let Ok((piece, board)) = Self::connect(&mut stream) else {
@@ -67,16 +57,15 @@ impl Client {
 
     pub fn recv_response(&mut self) -> io::Result<Response> {
         let data = read_str(&mut self.stream)?;
-        let err = io::Error::new(io::ErrorKind::InvalidData, "Failed to deserialize response");
+        let err = io_err!("Failed to deserialize response");
         serde_json::from_str(&data).map_err(|_| err)
     }
 }
 
 impl Clone for Client {
     fn clone(&self) -> Self {
-        Self {
-            stream: self.stream.try_clone().unwrap(),
-        }
+        let stream = self.stream.try_clone().unwrap();
+        Self { stream }
     }
 }
 
@@ -98,5 +87,7 @@ mod tests {
 
         assert!(!Client::validate_address("255.255.255.256:2222"));
         assert!(!Client::validate_address("0.0.0.0:65536"));
+        assert!(!Client::validate_address("0.0:11"));
+        assert!(!Client::validate_address("Melman"));
     }
 }

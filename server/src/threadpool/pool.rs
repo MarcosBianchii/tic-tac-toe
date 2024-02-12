@@ -1,9 +1,10 @@
 use super::worker::{Job, Worker};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::mpsc::{self, Sender};
+use std::sync::{Arc, Mutex};
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
-    sender: Option<mpsc::Sender<Job>>,
+    sender: Option<Sender<Job>>,
 }
 
 impl ThreadPool {
@@ -29,11 +30,8 @@ impl Drop for ThreadPool {
     fn drop(&mut self) {
         drop(self.sender.take());
 
-        self.workers
-            .iter_mut()
-            .inspect(|worker| println!("Shutting down worker {}", worker.id))
-            .map(|worker| worker.thread.take())
-            .flatten()
-            .for_each(|handle| handle.join().unwrap());
+        for worker in &mut self.workers {
+            worker.thread.take().map(|t| t.join());
+        }
     }
 }

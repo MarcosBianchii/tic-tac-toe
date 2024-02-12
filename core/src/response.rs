@@ -1,6 +1,4 @@
-use super::game::board::Board;
-use super::game::piece::Piece;
-use super::game::state::GameState;
+use super::game::{board::Board, piece::Piece, state::GameState};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -8,8 +6,9 @@ use std::fmt::{self, Display};
 pub enum Response {
     Valid { board: Board, state: GameState },
     Invalid,
-    WaitingForPlayer,
-    Connect { board: Board, piece: Piece },
+    Init { board: Board, piece: Piece },
+    Connect,
+    Disconnect,
 }
 
 impl Display for Response {
@@ -18,8 +17,9 @@ impl Display for Response {
         let s = match self {
             R::Valid { .. } => "Valid",
             R::Invalid => "Invalid",
-            R::WaitingForPlayer => "Waiting for player...",
-            R::Connect { .. } => "Connected",
+            R::Init { .. } => "Init",
+            R::Connect => "The other player connected",
+            R::Disconnect => "The other player disconnected",
         };
 
         write!(f, "{s}")

@@ -3,7 +3,6 @@ use crate::threadpool::ThreadPool;
 use core::game::piece::Piece;
 use core::{read_str, write_str};
 use core::{request::Request, response::Response};
-use serde_json;
 use std::io::{self, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
@@ -17,7 +16,7 @@ impl Server {
         Self(address)
     }
 
-    fn send<W: Write>(stream: &mut W, res: Response) -> io::Result<()> {
+    fn send_init<W: Write>(stream: &mut W, res: Response) -> io::Result<()> {
         let json = serde_json::to_string(&res)?;
         write_str(stream, &json)
     }
@@ -36,20 +35,18 @@ impl Server {
 
         let ip = stream.peer_addr()?.ip();
         println!("Player `{piece}` ({ip}) connected");
+
         let board = game.lock().unwrap().board;
-        Self::send(&mut stream, Response::Connect { piece, board })?;
+        Self::send_init(&mut stream, Response::Init { piece, board })?;
 
         loop {
-            println!("{:?}", game.lock().unwrap().board);
-
             let req = read_str(&mut stream)?;
             let req: Request = serde_json::from_str(&req)?;
+            let mut game = game.lock().unwrap();
 
             match req {
                 Request::Play { idx } => {
-                    let mut game = game.lock().unwrap();
                     let res = game.play(piece, idx);
-
                     match res {
                         Response::Valid { .. } => game.broadcast(res)?,
                         _ => game.send(piece, res)?,
@@ -57,8 +54,7 @@ impl Server {
                 }
 
                 Request::Disconnect => {
-                    let mut game = game.lock().unwrap();
-                    game.players.remove(&piece);
+                    game.disconnect(piece)?;
                     println!("Player `{piece}` ({ip}) disconnected");
                     break;
                 }
@@ -75,7 +71,9 @@ impl Server {
 
         let pool = ThreadPool::new(nthreads);
         let game = Arc::new(Mutex::new(Game::new()));
-        println!("Listening at address {}", self.0);
+
+        let port = self.0.port();
+        println!("Ready to rumble!!! (port: {port})");
 
         for stream in listener.incoming().flatten() {
             let game = Arc::clone(&game);

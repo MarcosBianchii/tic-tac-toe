@@ -1,7 +1,7 @@
 use core::game::state::GameState;
 use core::game::{board::Board, piece::Piece};
 use core::response::Response;
-use core::write_str;
+use core::{io_err, write_str};
 use std::collections::BTreeMap;
 use std::io;
 use std::net::TcpStream;
@@ -9,7 +9,8 @@ use std::net::TcpStream;
 pub struct Game {
     pub board: Board,
     pub players: BTreeMap<Piece, TcpStream>,
-    pub turn: Piece,
+    turn: Piece,
+    started: Piece,
 }
 
 impl Game {
@@ -20,8 +21,18 @@ impl Game {
     pub fn broadcast(&mut self, res: Response) -> io::Result<()> {
         let json = serde_json::to_string(&res)?;
 
-        for (_, stream) in &mut self.players {
+        for stream in self.players.values_mut() {
             write_str(stream, &json)?;
+        }
+
+        Ok(())
+    }
+
+    fn alert_other_player(&mut self, piece: Piece) -> io::Result<()> {
+        if let Some(other) = self.players.get_mut(&piece.other()) {
+            let res = Response::Connect;
+            let json = serde_json::to_string(&res)?;
+            write_str(other, &json)?;
         }
 
         Ok(())
@@ -35,9 +46,15 @@ impl Game {
                 Piece::X
             };
 
+            self.alert_other_player(piece).ok()?;
             self.players.insert(piece, stream);
             piece
         })
+    }
+
+    pub fn disconnect(&mut self, piece: Piece) -> io::Result<()> {
+        self.players.remove(&piece);
+        self.broadcast(Response::Disconnect)
     }
 
     pub fn play(&mut self, piece: Piece, idx: (usize, usize)) -> Response {
@@ -57,7 +74,8 @@ impl Game {
 
         if state != GameState::Playing {
             self.board = Board::new();
-            self.turn = Piece::default();
+            self.turn = self.started.other();
+            self.started = self.turn;
         }
 
         Response::Valid { board, state }
@@ -69,10 +87,7 @@ impl Game {
         self.players
             .get_mut(&piece)
             .map(|stream| write_str(stream, &json))
-            .ok_or(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Failed to send response",
-            ))?
+            .ok_or(io_err!("Failed to send reponse"))?
     }
 }
 
@@ -82,6 +97,7 @@ impl Default for Game {
             board: Board::new(),
             players: BTreeMap::new(),
             turn: Piece::default(),
+            started: Piece::default(),
         }
     }
 }

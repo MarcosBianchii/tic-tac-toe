@@ -1,6 +1,5 @@
-use std::{fmt::Display, str::FromStr};
-
 use serde::{Deserialize, Serialize};
+use std::{fmt::Display, str::FromStr};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Piece {
@@ -14,6 +13,13 @@ impl Piece {
             Piece::X => Piece::O,
             Piece::O => Piece::X,
         };
+    }
+
+    pub fn other(&self) -> Piece {
+        match self {
+            Piece::X => Piece::O,
+            Piece::O => Piece::X,
+        }
     }
 }
 

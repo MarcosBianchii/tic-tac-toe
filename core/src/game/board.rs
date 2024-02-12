@@ -4,12 +4,12 @@ use std::fmt::{self, Debug};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
 pub struct Board([Option<Piece>; 9]);
 
 impl Board {
     pub fn new() -> Self {
-        Self([None; 9])
+        Self::default()
     }
 
     pub fn is_full(&self) -> bool {
@@ -22,29 +22,27 @@ impl Board {
 
     pub fn check_end(&self, piece: Piece) -> GameState {
         for i in 0..3 {
-            if self[(0, i)] == self[(1, i)] && self[(1, i)] == self[(2, i)] {
-                if self[(0, i)].is_some() {
-                    return GameState::Win(piece);
-                }
+            if self[(i, 0)].is_some()
+                && self[(i, 0)] == self[(i, 1)]
+                && self[(i, 1)] == self[(i, 2)]
+            {
+                return GameState::Win(piece);
             }
 
-            if self[(i, 0)] == self[(i, 1)] && self[(i, 1)] == self[(i, 2)] {
-                if self[(i, 0)].is_some() {
-                    return GameState::Win(piece);
-                }
-            }
-        }
-
-        if self[(0, 0)] == self[(1, 1)] && self[(1, 1)] == self[(2, 2)] {
-            if self[(0, 0)].is_some() {
+            if self[(0, i)].is_some()
+                && self[(0, i)] == self[(1, i)]
+                && self[(1, i)] == self[(2, i)]
+            {
                 return GameState::Win(piece);
             }
         }
 
-        if self[(0, 2)] == self[(1, 1)] && self[(1, 1)] == self[(2, 0)] {
-            if self[(0, 2)].is_some() {
-                return GameState::Win(piece);
-            }
+        if self[(0, 0)].is_some() && self[(0, 0)] == self[(1, 1)] && self[(1, 1)] == self[(2, 2)] {
+            return GameState::Win(piece);
+        }
+
+        if self[(0, 2)].is_some() && self[(0, 2)] == self[(1, 1)] && self[(1, 1)] == self[(2, 0)] {
+            return GameState::Win(piece);
         }
 
         if self.is_full() {

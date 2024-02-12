@@ -1,7 +1,7 @@
 use colored::Colorize;
 use core::game::{board::Board, piece::Piece};
 
-pub fn clear() {
+fn clear() {
     print!("\x1B[2J\x1B[1;1H");
 }
 
@@ -25,7 +25,7 @@ pub fn print_board(board: &Board, idx: (usize, usize)) {
                             Piece::O => s.blue(),
                         }
                     })
-                    .unwrap_or(" ".to_string().black())
+                    .unwrap_or(" ".to_string().white())
             };
 
             print!("{piece} ");
@@ -43,7 +43,6 @@ pub fn print_board(board: &Board, idx: (usize, usize)) {
     }
 }
 
-#[allow(dead_code)]
 pub fn print_stalemate(board: &Board) {
     clear();
     for i in 0..3 {
@@ -57,23 +56,22 @@ pub fn print_stalemate(board: &Board) {
             print!("{piece} ");
 
             if j < 2 {
-                print!("{}", "|");
+                print!("|");
             }
         }
 
         if i == 1 {
-            print!("{}", "   Tie!");
+            print!("   Tie!");
         }
 
         println!();
 
         if i < 2 {
-            println!("{}", " - + - + - ");
+            println!(" - + - + - ");
         }
     }
 }
 
-#[allow(dead_code)]
 pub fn print_victory(board: &Board, player: Piece) {
     clear();
     let color = match player {
