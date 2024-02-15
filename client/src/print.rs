@@ -1,31 +1,33 @@
 use colored::Colorize;
 use core::game::{board::Board, piece::Piece};
 
-fn clear() {
+pub fn clear() {
     print!("\x1B[2J\x1B[1;1H");
 }
 
-pub fn print_board(board: &Board, idx: (usize, usize)) {
+pub fn print_board(board: &Board, idx: (usize, usize), msg: &str) {
     clear();
+    println!("{msg}");
+
     for i in 0..3 {
         for j in 0..3 {
             print!(" ");
             let piece = if (i, j) == idx {
-                if let Some(piece) = board[(i, j)] {
-                    piece.to_string().white()
-                } else {
-                    "_".to_string().white()
-                }
+                board[(i, j)]
+                    .map(|piece| piece.to_string())
+                    .unwrap_or("_".to_string())
+                    .white()
             } else {
                 board[(i, j)]
-                    .map(|x| {
-                        let s = x.to_string();
-                        match x {
-                            Piece::X => s.red(),
-                            Piece::O => s.blue(),
-                        }
+                    .map(|piece| {
+                        let color = match piece {
+                            Piece::X => |s: &str| s.red(),
+                            Piece::O => |s: &str| s.blue(),
+                        };
+
+                        color(&piece.to_string())
                     })
-                    .unwrap_or(" ".to_string().white())
+                    .unwrap_or(" ".to_string().yellow())
             };
 
             print!("{piece} ");
@@ -41,69 +43,59 @@ pub fn print_board(board: &Board, idx: (usize, usize)) {
             println!("{}", " - + - + - ".yellow());
         }
     }
+
+    println!();
 }
 
-pub fn print_stalemate(board: &Board) {
-    clear();
+fn print_str(board: &Board, msg: &str) -> String {
+    let mut s = String::with_capacity(0x50);
+
     for i in 0..3 {
         for j in 0..3 {
-            print!(" ");
-
+            s.push(' ');
             let piece = board[(i, j)]
-                .map(|x| x.to_string().white())
-                .unwrap_or(" ".to_string().white());
+                .map(|x| x.to_string())
+                .unwrap_or(" ".to_string());
 
-            print!("{piece} ");
+            s.push_str(&piece);
+            s.push(' ');
 
             if j < 2 {
-                print!("|");
+                s.push('|');
             }
         }
 
         if i == 1 {
-            print!("   Tie!");
+            s.push_str(&format!("   {msg}"));
         }
 
-        println!();
+        s.push('\n');
 
         if i < 2 {
-            println!(" - + - + - ");
+            s.push_str(" - + - + - ");
+            s.push('\n');
         }
     }
+
+    s
+}
+
+pub fn print_stalemate(board: &Board) {
+    let s = print_str(board, "Tie!");
+    clear();
+    println!("\n{}", s.white());
 }
 
 pub fn print_victory(board: &Board, player: Piece) {
-    clear();
+    let s = print_str(board, &format!("{player} Wins!"));
+
     let color = match player {
         Piece::X => |s: &str| s.red(),
         Piece::O => |s: &str| s.blue(),
     };
 
-    for i in 0..3 {
-        for j in 0..3 {
-            print!(" ");
-
-            let piece = board[(i, j)]
-                .map(|x| color(&x.to_string()))
-                .unwrap_or(" ".to_string().white());
-
-            print!("{piece} ");
-
-            if j < 2 {
-                print!("{}", color("|"));
-            }
-        }
-
-        if i == 1 {
-            print!("{}", color(&format!("   {player} Wins!")));
-        }
-
-        println!();
-
-        if i < 2 {
-            println!("{}", color(" - + - + - "));
-        }
-    }
+    clear();
+    println!("\n{}", color(&s));
 }
 
 #[cfg(test)]
@@ -115,7 +107,7 @@ mod tests {
     #[ignore]
     fn print() {
         let board = Board::from_str("x x x o o o - - -").unwrap();
-        print_board(&board, (1, 1));
+        print_board(&board, (1, 1), "msg");
     }
 
     #[test]

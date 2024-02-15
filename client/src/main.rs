@@ -5,7 +5,7 @@ use client::Client;
 use colored::Colorize;
 use core::game::{piece::Piece, state::GameState};
 use core::{request::Request, response::Response};
-use print::{print_board, print_stalemate, print_victory};
+use print::{clear, print_board, print_stalemate, print_victory};
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed as Or};
 use std::sync::{Arc, Mutex};
@@ -38,33 +38,43 @@ fn main() -> Result<(), &'static str> {
     thread::spawn(move || loop {
         match client_send.recv_response() {
             Ok(Response::Valid { piece, idx, state }) => {
-                let mut board_lock = board_send.lock().unwrap();
-                board_lock[idx] = Some(piece);
+                let mut board = board_send.lock().unwrap();
+                board[idx] = Some(piece);
 
                 match state {
                     GameState::Playing => {
-                        print_board(&board_lock, (x_send.load(Or), y_send.load(Or)));
+                        print_board(&board, (x_send.load(Or), y_send.load(Or)), "");
                     }
 
                     GameState::Win(played_piece) => {
-                        print_victory(&board_lock, played_piece);
-                        board_lock.clear();
+                        print_victory(&board, played_piece);
+                        board.clear();
                     }
 
                     GameState::Stalemate => {
-                        print_stalemate(&board_lock);
-                        board_lock.clear();
+                        print_stalemate(&board);
+                        board.clear();
                     }
                 }
             }
 
-            Ok(res) => println!("{res}"),
+            Ok(res) => {
+                let board = board_send.lock().unwrap();
+                let msg = res.to_string();
+                print_board(&board, (x_send.load(Or), y_send.load(Or)), &msg);
+            }
 
-            _ => {}
+            Err(_) => {
+                clear();
+                println!("Server disconnected, press `q` to exit");
+                print!("{prompt_send}");
+                stdout_send.lock().flush().unwrap();
+                break;
+            }
         }
 
         print!("{prompt_send}");
-        stdout_send.lock().flush().expect("Failed to flush stdout");
+        stdout_send.lock().flush().unwrap();
     });
 
     let stdin = io::stdin();
@@ -73,7 +83,7 @@ fn main() -> Result<(), &'static str> {
 
     loop {
         let (xx, yy) = (x.load(Or), y.load(Or));
-        print_board(&board.lock().unwrap(), (xx, yy));
+        print_board(&board.lock().unwrap(), (xx, yy), "");
 
         print!("{prompt}");
         stdout.lock().flush().expect("Failed to flush stdout");

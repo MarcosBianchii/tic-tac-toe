@@ -17,16 +17,6 @@ impl Game {
         Self::default()
     }
 
-    pub fn broadcast(&mut self, res: Response) -> io::Result<()> {
-        let json = serde_json::to_string(&res)?;
-
-        for stream in self.players.values_mut() {
-            write_str(stream, &json)?;
-        }
-
-        Ok(())
-    }
-
     fn alert_other_player(&mut self, piece: Piece) -> io::Result<()> {
         if let Some(other) = self.players.get_mut(&piece.other()) {
             let res = Response::Connect;
@@ -86,6 +76,16 @@ impl Game {
             .get_mut(&piece)
             .map(|stream| write_str(stream, &json))
             .ok_or(io_err!("Failed to send reponse"))?
+    }
+
+    pub fn broadcast(&mut self, res: Response) -> io::Result<()> {
+        let json = serde_json::to_string(&res)?;
+
+        for stream in self.players.values_mut() {
+            write_str(stream, &json)?;
+        }
+
+        Ok(())
     }
 }
 

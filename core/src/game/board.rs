@@ -4,8 +4,10 @@ use std::fmt::{self, Debug};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
+const LEN: usize = 9;
+
 #[derive(Serialize, Deserialize, Clone, Copy, Default)]
-pub struct Board([Option<Piece>; 9]);
+pub struct Board([Option<Piece>; LEN]);
 
 impl Board {
     pub fn new() -> Self {
@@ -13,7 +15,7 @@ impl Board {
     }
 
     pub fn is_full(&self) -> bool {
-        self.0.iter().flatten().count() == 9
+        self.0.iter().flatten().count() == LEN
     }
 
     pub fn clear(&mut self) {
@@ -67,12 +69,12 @@ impl IndexMut<(usize, usize)> for Board {
 }
 
 impl FromStr for Board {
-    type Err = &'static str;
+    type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut pieces = [None; 9];
+        let mut pieces = [None; LEN];
 
         s.split_whitespace()
-            .take(9)
+            .take(LEN)
             .map(|c| Piece::from_str(c).ok())
             .enumerate()
             .for_each(|(i, p)| pieces[i] = p);
