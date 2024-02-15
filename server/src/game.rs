@@ -1,4 +1,3 @@
-use core::game::state::GameState;
 use core::game::{board::Board, piece::Piece};
 use core::response::Response;
 use core::{io_err, write_str};
@@ -59,26 +58,25 @@ impl Game {
 
     pub fn play(&mut self, piece: Piece, idx: (usize, usize)) -> Response {
         if piece != self.turn {
-            return Response::Invalid;
+            return Response::Invalid(String::from("Not your turn"));
         }
 
         if self.board[idx].is_some() {
-            return Response::Invalid;
+            return Response::Invalid(String::from("Cell already occupied"));
         }
 
         self.board[idx] = Some(piece);
         self.turn.next();
 
         let state = self.board.check_end(piece);
-        let board = self.board;
 
-        if state != GameState::Playing {
-            self.board = Board::new();
+        if state.is_end() {
             self.turn = self.started.other();
             self.started = self.turn;
+            self.board.clear();
         }
 
-        Response::Valid { board, state }
+        Response::Valid { piece, idx, state }
     }
 
     pub fn send(&mut self, piece: Piece, res: Response) -> io::Result<()> {

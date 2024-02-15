@@ -7,3 +7,10 @@ pub enum GameState {
     Win(Piece),
     Stalemate,
 }
+
+impl GameState {
+    pub fn is_end(&self) -> bool {
+        use GameState as Gs;
+        matches!(self, Gs::Win(_) | Gs::Stalemate)
+    }
+}

@@ -3,7 +3,7 @@ mod print;
 
 use client::Client;
 use colored::Colorize;
-use core::game::{board::Board, piece::Piece, state::GameState};
+use core::game::{piece::Piece, state::GameState};
 use core::{request::Request, response::Response};
 use print::{print_board, print_stalemate, print_victory};
 use std::io::{self, Write};
@@ -37,9 +37,9 @@ fn main() -> Result<(), &'static str> {
 
     thread::spawn(move || loop {
         match client_send.recv_response() {
-            Ok(Response::Valid { board, state }) => {
+            Ok(Response::Valid { piece, idx, state }) => {
                 let mut board_lock = board_send.lock().unwrap();
-                *board_lock = board;
+                board_lock[idx] = Some(piece);
 
                 match state {
                     GameState::Playing => {
@@ -48,12 +48,12 @@ fn main() -> Result<(), &'static str> {
 
                     GameState::Win(played_piece) => {
                         print_victory(&board_lock, played_piece);
-                        *board_lock = Board::new();
+                        board_lock.clear();
                     }
 
                     GameState::Stalemate => {
                         print_stalemate(&board_lock);
-                        *board_lock = Board::new();
+                        board_lock.clear();
                     }
                 }
             }

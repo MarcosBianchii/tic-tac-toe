@@ -16,8 +16,8 @@ impl Board {
         self.0.iter().flatten().count() == 9
     }
 
-    pub fn data(&self) -> &[Option<Piece>] {
-        &self.0
+    pub fn clear(&mut self) {
+        *self = Self::default();
     }
 
     pub fn check_end(&self, piece: Piece) -> GameState {
