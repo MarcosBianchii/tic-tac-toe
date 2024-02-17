@@ -8,12 +8,6 @@ This is a simple online tic-tac-toe game following a client-server architecture.
 
 When a client connects, handles it's connection through a thread in a thread pool. The server is responsible for managing the game state and sending updates to the clients. Only one game can be played at a time.
 
-
-It is responsible for the following tasks:
-- Managing the game state.
-- Sending updates to both clients when a move is made.
-- Handling disconnections.
-
 ```sh
 cargo run --bin server -- <PORT>
 ```
