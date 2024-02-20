@@ -42,8 +42,9 @@ impl Game {
     }
 
     pub fn disconnect(&mut self, piece: Piece) -> io::Result<()> {
+        self.broadcast(Response::Disconnect(piece))?;
         self.players.remove(&piece);
-        self.broadcast(Response::Disconnect)
+        Ok(())
     }
 
     pub fn play(&mut self, piece: Piece, idx: (usize, usize)) -> Response {

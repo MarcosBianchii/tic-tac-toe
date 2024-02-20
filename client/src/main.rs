@@ -35,7 +35,7 @@ fn main() -> Result<(), &'static str> {
     let stdout_send = io::stdout();
     let prompt_send = prompt.clone();
 
-    thread::spawn(move || loop {
+    let handle = thread::spawn(move || loop {
         match client_send.recv_response() {
             Ok(Response::Valid { piece, idx, state }) => {
                 let mut board = board_send.lock().unwrap();
@@ -57,6 +57,8 @@ fn main() -> Result<(), &'static str> {
                     }
                 }
             }
+
+            Ok(Response::Disconnect(down_piece)) if down_piece == piece => break,
 
             Ok(res) => {
                 let board = board_send.lock().unwrap();
@@ -89,7 +91,7 @@ fn main() -> Result<(), &'static str> {
         stdout.lock().flush().expect("Failed to flush stdout");
         stdin.read_line(&mut input).unwrap();
 
-        match input.trim().to_lowercase().as_ref() {
+        match input.to_lowercase().trim() {
             "w" => x.store(xx.checked_sub(1).unwrap_or(2), Or),
             "a" => y.store(yy.checked_sub(1).unwrap_or(2), Or),
             "s" => x.store((xx + 1) % 3, Or),
@@ -107,5 +109,6 @@ fn main() -> Result<(), &'static str> {
         input.clear();
     }
 
-    Ok(())
+    drop(client);
+    handle.join().map_err(|_| "Failed to join thread")
 }

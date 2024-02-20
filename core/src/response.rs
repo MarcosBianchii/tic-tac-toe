@@ -15,7 +15,7 @@ pub enum Response {
         piece: Piece,
     },
     Connect,
-    Disconnect,
+    Disconnect(Piece),
 }
 
 impl Display for Response {
@@ -26,7 +26,7 @@ impl Display for Response {
             R::Invalid(msg) => format!("Invalid move: {msg}"),
             R::Init { .. } => "Init".to_string(),
             R::Connect => "The other player connected".to_string(),
-            R::Disconnect => "The other player disconnected".to_string(),
+            R::Disconnect(piece) => format!("Player `{piece}` disconnected"),
         };
 
         write!(f, "{s}")
