@@ -13,15 +13,15 @@ impl Client {
             return false;
         };
 
-        if port.is_empty() {
+        if port.parse::<u16>().unwrap_or_default() == 0 {
             return false;
         }
 
-        if address.split('.').flat_map(str::parse::<u8>).count() != 4 {
-            return false;
+        if address.to_lowercase() == "localhost" {
+            return true;
         }
 
-        port.parse::<u16>().is_ok()
+        address.split('.').flat_map(str::parse::<u8>).count() == 4
     }
 
     fn connect(stream: &mut TcpStream) -> io::Result<(Piece, Board)> {
@@ -84,10 +84,13 @@ mod tests {
         assert!(Client::validate_address("127.0.0.1:8080"));
         assert!(Client::validate_address("255.255.255.255:1111"));
         assert!(Client::validate_address("0.0.0.0:65535"));
+        assert!(Client::validate_address("localhost:1"));
+        assert!(Client::validate_address("LOCALHOST:8080"));
 
         assert!(!Client::validate_address("255.255.255.256:2222"));
         assert!(!Client::validate_address("0.0.0.0:65536"));
         assert!(!Client::validate_address("0.0:11"));
         assert!(!Client::validate_address("Melman"));
+        assert!(!Client::validate_address("localhost:0"));
     }
 }
